@@ -1,5 +1,5 @@
-const { type } = require('express/lib/response');
-const mongoose = require('mongoose');
+const { type } = require("express/lib/response");
+const mongoose = require("mongoose");
 
 const productSchema = new mongoose.Schema({
   name: {
@@ -79,8 +79,8 @@ const productSchema = new mongoose.Schema({
       },
     },
   ],
-  user:{
-    type:mongoose.Schema.Types.ObjectId
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
   },
   createdAt: {
     type: Date,
@@ -88,7 +88,6 @@ const productSchema = new mongoose.Schema({
   },
 });
 
+let schema = mongoose.model("Product", productSchema);
 
-let schema = mongoose.model('Product',productSchema)
-
-module.exports = schema
+module.exports = schema;
