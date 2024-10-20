@@ -1,16 +1,15 @@
-const express = require("express");
-const app = express();
-const errorMiddleware = require("./midddlewares/error");
-const cookieParser = require("cookie-parser");
+import express from "express";
+import errorMiddleware from "./middlewares/error.js";
+import cookieParser from "cookie-parser";
 
+const app = express();
 
 app.use(express.json());
 app.use(cookieParser());
 
-
-const products = require("./routes/product");
-const auth = require("./routes/auth");
-const order = require("./routes/order");
+import products from "./routes/product.js";
+import auth from "./routes/auth.js";
+import order from "./routes/order.js";
 
 app.use("/api/v1/", products);
 app.use("/api/v1/", auth);
@@ -18,4 +17,4 @@ app.use("/api/v1/", order);
 
 app.use(errorMiddleware);
 
-module.exports = app;
+export default app;

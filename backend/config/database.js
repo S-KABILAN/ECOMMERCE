@@ -1,14 +1,21 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
-const connectDatabse = async () => {
-  mongoose
-    .connect(process.env.DB_LOCAL_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    })
-    .then((con) => {
-      console.log(`MongoDB is connected to the host: ${con.connection.host}`);
+const connectDatabase = async () => {
+  try {
+    const dbURI = process.env.DB_URI; // Ensure this matches your .env variable
+    if (!dbURI) {
+      throw new Error(
+        "Database URI is not defined in the environment variables."
+      );
+    }
+    await mongoose.connect(dbURI, {
+      //useNewUrlParser: true,
+      //useUnifiedTopology: true,
     });
+    console.log("Database connected successfully");
+  } catch (error) {
+    console.error(`Database connection failed: ${error.message}`);
+  }
 };
 
-module.exports = connectDatabse;
+export default connectDatabase;

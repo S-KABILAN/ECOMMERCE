@@ -1,9 +1,8 @@
-const { type } = require("express/lib/response");
-const mongoose = require("mongoose");
-const validator = require("validator");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
+import mongoose from "mongoose";
+import validator from "validator";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -74,4 +73,4 @@ userSchema.methods.getResetToken = function () {
 
 let model = mongoose.model("User", userSchema);
 
-module.exports = model;
+export default model;

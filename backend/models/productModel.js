@@ -1,5 +1,4 @@
-const { type } = require("express/lib/response");
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema({
   name: {
@@ -90,4 +89,4 @@ const productSchema = new mongoose.Schema({
 
 let schema = mongoose.model("Product", productSchema);
 
-module.exports = schema;
+export default schema;

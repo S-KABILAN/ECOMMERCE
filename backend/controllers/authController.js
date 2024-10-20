@@ -1,12 +1,13 @@
-const catchAsyncError = require("../midddlewares/catchAsyncError");
-const User = require("../models/userModel");
-const ErrorHandler = require("../utils/errorHandler");
-const sendToken = require("../utils/jwt");
-const sendEmail = require("../utils/email");
-const crypto = require("crypto");
-const { status } = require("express/lib/response");
+import catchAsyncError from "../middlewares/catchAsyncError.js";
+import User from "../models/userModel.js";
+import ErrorHandler from "../utils/errorHandler.js";
+import sendToken from "../utils/jwt.js";
+import sendEmail from "../utils/email.js";
+import crypto from "crypto";
+import { sendResponse } from "../utils/responseHandler.js";
 
-exports.registerUser = catchAsyncError(async (req, res, next) => {
+// Register User - /api/v1/register
+export const registerUser = catchAsyncError(async (req, res, next) => {
   const { name, email, password, avatar } = req.body;
 
   const user = await User.create({
@@ -19,28 +20,26 @@ exports.registerUser = catchAsyncError(async (req, res, next) => {
   sendToken(user, 201, res);
 });
 
-exports.loginUser = catchAsyncError(async (req, res, next) => {
+// Login User - /api/v1/login
+export const loginUser = catchAsyncError(async (req, res, next) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return next(new ErrorHandler("Please enter you email & password", 400));
+    return next(new ErrorHandler("Please enter your email & password", 400));
   }
 
-  //find the user databse
+  // Find the user in the database
   const user = await User.findOne({ email }).select("+password");
 
-  if (!user) {
+  if (!user || !(await user.isValidPassword(password))) {
     return next(new ErrorHandler("Invalid email or password", 401));
   }
 
-  if (!(await user.isValidPassword(password))) {
-    return next(new ErrorHandler("Invalid email or password", 401));
-  }
-
-  sendToken(user, 201, res);
+  sendToken(user, 200, res); // Changed to 200 for successful login
 });
 
-exports.logOutUser = (req, res, next) => {
+// Logout User
+export const logOutUser = (req, res, next) => {
   res
     .cookie("token", null, {
       expires: new Date(Date.now()),
@@ -49,11 +48,12 @@ exports.logOutUser = (req, res, next) => {
     .status(200)
     .json({
       success: true,
-      message: "LoggedOut Successfully",
+      message: "Logged out successfully",
     });
 };
 
-exports.forgotPassword = catchAsyncError(async (req, res, next) => {
+// Forgot Password - /api/v1/password/forgot
+export const forgotPassword = catchAsyncError(async (req, res, next) => {
   const user = await User.findOne({ email: req.body.email });
 
   if (!user) {
@@ -63,51 +63,46 @@ exports.forgotPassword = catchAsyncError(async (req, res, next) => {
   const resetToken = user.getResetToken();
   await user.save({ validateBeforeSave: false });
 
-  //create reset url
+  // Create reset URL
   const resetUrl = `${req.protocol}://${req.get("host")}/api/v1/password/reset/${resetToken}`;
-
-  const message = `Your Password reset url is as follows \n\n
-    ${resetUrl} \n\n if you have not requested this email, then ignore it.`;
+  const message = `Your password reset URL is as follows: \n\n${resetUrl}\n\nIf you did not request this email, please ignore it.`;
 
   try {
-    sendEmail({
+    await sendEmail({
       email: user.email,
-      subject: "ecart Password recovery",
-      message: message,
+      subject: "Ecart Password Recovery",
+      message,
     });
 
-    res.status(200).json({
-      success: true,
-      message: `Email send to ${user.email}`,
-    });
+    sendResponse(res, 200, true, `Email sent to ${user.email}`);
+
   } catch (error) {
     user.resetPasswordToken = undefined;
     user.resetPasswordTokenExpire = undefined;
     await user.save({ validateBeforeSave: false });
-    return next(new ErrorHandler(error.message), 500);
+    return next(new ErrorHandler("Failed to send email", 500));
   }
 });
 
-//Reset Password
-exports.resetPassword = catchAsyncError(async (req, res, next) => {
+// Reset Password - /api/v1/password/reset/:token
+export const resetPassword = catchAsyncError(async (req, res, next) => {
   const resetPasswordToken = crypto
     .createHash("sha256")
     .update(req.params.token)
     .digest("hex");
-
   const user = await User.findOne({
     resetPasswordToken,
-    resetPasswordTokenExpire: {
-      $gt: Date.now(),
-    },
+    resetPasswordTokenExpire: { $gt: Date.now() },
   });
 
   if (!user) {
-    return next(new ErrorHandler("password reset token is invalid or expired"));
+    return next(
+      new ErrorHandler("Password reset token is invalid or expired", 400)
+    );
   }
 
   if (req.body.password !== req.body.confirmPassword) {
-    return next(new ErrorHandler("Password does not match"));
+    return next(new ErrorHandler("Passwords do not match", 400));
   }
 
   user.password = req.body.password;
@@ -115,39 +110,36 @@ exports.resetPassword = catchAsyncError(async (req, res, next) => {
   user.resetPasswordTokenExpire = undefined;
   await user.save({ validateBeforeSave: false });
 
-  sendToken(user, 201, res);
+  sendToken(user, 200, res); // Changed to 200 for successful reset
 });
 
-//Get User Profile - /api/v1/getprofile
-exports.getUserProfile = catchAsyncError(async (req, res, next) => {
+// Get User Profile - /api/v1/profile
+export const getUserProfile = catchAsyncError(async (req, res, next) => {
   const user = await User.findById(req.user.id);
 
-  res.status(200).json({
-    success: true,
-    user,
-  });
+  sendResponse(res, 200, true, "User profile retrieved successfully", user);
+
 });
 
-//Change Password - /api/v1/password/change
-exports.changePassword = catchAsyncError(async (req, res, next) => {
+// Change Password - /api/v1/password/change
+export const changePassword = catchAsyncError(async (req, res, next) => {
   const user = await User.findById(req.user.id).select("+password");
 
-  //Check old password
+  // Check old password
   if (!(await user.isValidPassword(req.body.oldPassword))) {
     return next(new ErrorHandler("Old password is incorrect", 401));
   }
 
-  //assigning new password
+  // Assign new password
   user.password = req.body.password;
   await user.save();
-  res.status(200).json({
-    success: true,
-  });
+
+  sendResponse(res, 200, true, "Password changed successfully");
 });
 
-//Update profile - /api/v1/update
-exports.updateProfile = catchAsyncError(async (req, res, next) => {
-  let newUserData = {
+// Update Profile - /api/v1/profile/update
+export const updateProfile = catchAsyncError(async (req, res, next) => {
+  const newUserData = {
     name: req.body.name,
     email: req.body.email,
   };
@@ -157,40 +149,33 @@ exports.updateProfile = catchAsyncError(async (req, res, next) => {
     runValidators: true,
   });
 
-  res.status(200).json({
-    success: true,
-    user,
-  });
+  sendResponse(res, 200, true, "Profile updated successfully", user);
+
 });
 
-//Admin: Get All users - /api/v1/admin/users
-exports.getAllUsers = catchAsyncError(async (req, res, next) => {
+// Admin: Get All Users - /api/v1/admin/users
+export const getAllUsers = catchAsyncError(async (req, res, next) => {
   const users = await User.find();
 
-  res.status(200).json({
-    success: true,
-    users,
-  });
+  sendResponse(res, 200, true, "Users retrieved successfully", users);
+
 });
 
-//Admin: Get Specific user -/api/v1/admin/user/:id
-exports.getUser = catchAsyncError(async (req, res, next) => {
+// Admin: Get Specific User - /api/v1/admin/user/:id
+export const getUser = catchAsyncError(async (req, res, next) => {
   const user = await User.findById(req.params.id);
 
   if (!user) {
     return next(
-      new ErrorHandler(`User not found with this ${req.params.id}`, 400),
+      new ErrorHandler(`User not found with this ID: ${req.params.id}`, 404)
     );
   }
 
-  res.status(200).json({
-    success: true,
-    user,
-  });
+  sendResponse(res, 200, true, "User retrieved successfully", user);
 });
 
-//Admin: Update User - /api/v1/admin/user/:id
-exports.updateUser = catchAsyncError(async (req, res, next) => {
+// Admin: Update User - /api/v1/admin/user/:id
+export const updateUser = catchAsyncError(async (req, res, next) => {
   const newUserData = {
     name: req.body.name,
     email: req.body.email,
@@ -202,22 +187,20 @@ exports.updateUser = catchAsyncError(async (req, res, next) => {
     runValidators: true,
   });
 
-  res.status(200).json({
-    success: true,
-    user,
-  });
+  sendResponse(res, 200, true, "User updated successfully", user);
 });
 
-//Admin: Delete User - /api/v1/admin/user/:id
-exports.deleteUser = catchAsyncError(async (req, res, next) => {
-  const user = User.findById(req.params.id);
+// Admin: Delete User - /api/v1/admin/user/:id
+export const deleteUser = catchAsyncError(async (req, res, next) => {
+  const user = await User.findById(req.params.id);
 
   if (!user) {
-    return next(new ErrorHandler(`User not found with this ${req.params.id}`));
+    return next(
+      new ErrorHandler(`User not found with this ID: ${req.params.id}`, 404)
+    );
   }
 
   await user.deleteOne();
-  res.status(200).json({
-    success: true,
-  });
+
+  sendResponse(res, 200, true, "User deleted successfully");
 });
