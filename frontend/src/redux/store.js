@@ -4,7 +4,6 @@ import ProductReducer from './slices/productsSlice'
 const reducer = combineReducers({
     ProductsState: ProductReducer
 })
-
 const store = configureStore({
     reducer,
 })
