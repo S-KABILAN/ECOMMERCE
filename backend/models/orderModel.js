@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const orderSchema = mongoose.Schema({
   shippingInfo: {
@@ -102,5 +102,4 @@ const orderSchema = mongoose.Schema({
 
 let orderModel = mongoose.model("Order", orderSchema);
 
-module.exports = orderModel;
-
+export default orderModel;
