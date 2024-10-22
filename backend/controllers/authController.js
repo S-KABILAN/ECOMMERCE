@@ -5,6 +5,9 @@ import sendToken from "../utils/jwt.js";
 import sendEmail from "../utils/email.js";
 import crypto from "crypto";
 import { sendResponse } from "../utils/responseHandler.js";
+import { factoryService } from "../services/factoryService.js";
+import { StatusCodes } from "http-status-codes";
+
 
 // Register User - /api/v1/register
 export const registerUser = catchAsyncError(async (req, res, next) => {
@@ -17,26 +20,30 @@ export const registerUser = catchAsyncError(async (req, res, next) => {
     avatar,
   });
 
-  sendToken(user, 201, res);
+  sendToken(user, StatusCodes.CREATED, res);
 });
+
 
 // Login User - /api/v1/login
 export const loginUser = catchAsyncError(async (req, res, next) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return next(new ErrorHandler("Please enter your email & password", 400));
+    return next(
+      new ErrorHandler("Please enter your email & password", StatusCodes.BAD_REQUEST)
+    );
   }
 
   // Find the user in the database
-  const user = await User.findOne({ email }).select("+password");
+  const user = await factoryService.find(User,{ email }).select("+password");
 
   if (!user || !(await user.isValidPassword(password))) {
-    return next(new ErrorHandler("Invalid email or password", 401));
+    return next(new ErrorHandler("Invalid email or password", StatusCodes.UNAUTHORIZED));
   }
 
-  sendToken(user, 200, res); // Changed to 200 for successful login
+  sendToken(user, StatusCodes.OK, res); // Changed to 200 for successful login
 });
+
 
 // Logout User
 export const logOutUser = (req, res, next) => {
@@ -45,7 +52,7 @@ export const logOutUser = (req, res, next) => {
       expires: new Date(Date.now()),
       httpOnly: true,
     })
-    .status(200)
+    .status(StatusCodes.OK)
     .json({
       success: true,
       message: "Logged out successfully",
@@ -57,7 +64,7 @@ export const forgotPassword = catchAsyncError(async (req, res, next) => {
   const user = await User.findOne({ email: req.body.email });
 
   if (!user) {
-    return next(new ErrorHandler("User not found with this email", 404));
+    return next(new ErrorHandler("User not found with this email", StatusCodes.NOT_FOUND));
   }
 
   const resetToken = user.getResetToken();
@@ -74,13 +81,13 @@ export const forgotPassword = catchAsyncError(async (req, res, next) => {
       message,
     });
 
-    sendResponse(res, 200, true, `Email sent to ${user.email}`);
+    sendResponse(res, StatusCodes.OK, true, `Email sent to ${user.email}`);
 
   } catch (error) {
     user.resetPasswordToken = undefined;
     user.resetPasswordTokenExpire = undefined;
     await user.save({ validateBeforeSave: false });
-    return next(new ErrorHandler("Failed to send email", 500));
+    return next(new ErrorHandler("Failed to send email", StatusCodes.INTERNAL_SERVER_ERROR));
   }
 });
 
@@ -97,12 +104,12 @@ export const resetPassword = catchAsyncError(async (req, res, next) => {
 
   if (!user) {
     return next(
-      new ErrorHandler("Password reset token is invalid or expired", 400)
+      new ErrorHandler("Password reset token is invalid or expired", StatusCodes.BAD_REQUEST)
     );
   }
 
   if (req.body.password !== req.body.confirmPassword) {
-    return next(new ErrorHandler("Passwords do not match", 400));
+    return next(new ErrorHandler("Passwords do not match", StatusCodes.BAD_REQUEST));
   }
 
   user.password = req.body.password;
@@ -110,14 +117,14 @@ export const resetPassword = catchAsyncError(async (req, res, next) => {
   user.resetPasswordTokenExpire = undefined;
   await user.save({ validateBeforeSave: false });
 
-  sendToken(user, 200, res); // Changed to 200 for successful reset
+  sendToken(user, StatusCodes.OK, res); // Changed to 200 for successful reset
 });
 
 // Get User Profile - /api/v1/profile
 export const getUserProfile = catchAsyncError(async (req, res, next) => {
-  const user = await User.findById(req.user.id);
+  const user = await factoryService.findById(User, req.user.id);
 
-  sendResponse(res, 200, true, "User profile retrieved successfully", user);
+  sendResponse(res, StatusCodes.OK, true, "User profile retrieved successfully", user);
 
 });
 
@@ -127,14 +134,14 @@ export const changePassword = catchAsyncError(async (req, res, next) => {
 
   // Check old password
   if (!(await user.isValidPassword(req.body.oldPassword))) {
-    return next(new ErrorHandler("Old password is incorrect", 401));
+    return next(new ErrorHandler("Old password is incorrect", StatusCodes.NOT_FOUND));
   }
 
   // Assign new password
   user.password = req.body.password;
   await user.save();
 
-  sendResponse(res, 200, true, "Password changed successfully");
+  sendResponse(res, StatusCodes.OK, true, "Password changed successfully");
 });
 
 // Update Profile - /api/v1/profile/update
@@ -144,34 +151,40 @@ export const updateProfile = catchAsyncError(async (req, res, next) => {
     email: req.body.email,
   };
 
-  const user = await User.findByIdAndUpdate(req.user.id, newUserData, {
-    new: true,
-    runValidators: true,
-  });
+  const user = await factoryService.updateById(User, req.user.id, newUserData);
 
-  sendResponse(res, 200, true, "Profile updated successfully", user);
+  sendResponse(res, StatusCodes.OK, true, "Profile updated successfully", user);
 
 });
 
 // Admin: Get All Users - /api/v1/admin/users
 export const getAllUsers = catchAsyncError(async (req, res, next) => {
-  const users = await User.find();
+  const users = await factoryService.find(User, {});
 
-  sendResponse(res, 200, true, "Users retrieved successfully", users);
+  sendResponse(
+    res,
+    StatusCodes.OK,
+    true,
+    "Users retrieved successfully",
+    users
+  );
 
 });
 
 // Admin: Get Specific User - /api/v1/admin/user/:id
 export const getUser = catchAsyncError(async (req, res, next) => {
-  const user = await User.findById(req.params.id);
+  const user = await factoryService.findById(User, req.params.id);
 
   if (!user) {
     return next(
-      new ErrorHandler(`User not found with this ID: ${req.params.id}`, 404)
+      new ErrorHandler(
+        `User not found with this ID: ${req.params.id}`,
+        StatusCodes.NOT_FOUND
+      )
     );
   }
 
-  sendResponse(res, 200, true, "User retrieved successfully", user);
+  sendResponse(res, StatusCodes.OK, true, "User retrieved successfully", user);
 });
 
 // Admin: Update User - /api/v1/admin/user/:id
@@ -182,25 +195,29 @@ export const updateUser = catchAsyncError(async (req, res, next) => {
     role: req.body.role,
   };
 
-  const user = await User.findByIdAndUpdate(req.params.id, newUserData, {
-    new: true,
-    runValidators: true,
-  });
+  const user = await factoryService.updateById(
+    User,
+    req.params.id,
+    newUserData
+  );
 
-  sendResponse(res, 200, true, "User updated successfully", user);
+  sendResponse(res, StatusCodes.OK, true, "User updated successfully", user);
 });
 
 // Admin: Delete User - /api/v1/admin/user/:id
 export const deleteUser = catchAsyncError(async (req, res, next) => {
-  const user = await User.findById(req.params.id);
+  const user = await factoryService.findById(User, req.params.id);
 
   if (!user) {
     return next(
-      new ErrorHandler(`User not found with this ID: ${req.params.id}`, 404)
+      new ErrorHandler(
+        `User not found with this ID: ${req.params.id}`,
+        StatusCodes.NOT_FOUND
+      )
     );
   }
 
-  await user.deleteOne();
+  await factoryService.deleteById(User, req.params.id);
 
-  sendResponse(res, 200, true, "User deleted successfully");
+  sendResponse(res, StatusCodes.OK, true, "User deleted successfully");
 });

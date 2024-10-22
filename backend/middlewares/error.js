@@ -1,5 +1,7 @@
+import { StatusCodes } from "http-status-codes";
+
 const ErrorHandler = (err, req, res, next) => {
-  err.statusCode = err.statusCode || 500;
+  err.statusCode = err.statusCode || StatusCodes.INTERNAL_SERVER_ERROR;
 
   if (process.env.NODE_ENV === "development") {
     res.status(err.statusCode).json({
@@ -19,25 +21,25 @@ const ErrorHandler = (err, req, res, next) => {
         .map((value) => value.message)
         .join(", ");
       error = new Error(message);
-      err.statusCode = 400;
+      err.statusCode = StatusCodes.BAD_REQUEST;
     }
 
     if (err.name === "CastError") {
       message = `Resource not found: ${err.path}`;
       error = new Error(message);
-      err.statusCode = 400;
+      err.statusCode = StatusCodes.BAD_REQUEST;
     }
 
     if (err.code === 11000) {
       message = `Duplicate ${Object.keys(err.keyValue)} error`;
       error = new Error(message);
-      err.statusCode = 400;
+      err.statusCode = StatusCodes.BAD_REQUEST;
     }
 
     if (err.name === "JSONWebTokenError") {
       message = `JSON Web Token is invalid. Try again`;
       error = new Error(message);
-      err.statusCode = 400;
+      err.statusCode = StatusCodes.BAD_REQUEST;
     }
 
     res.status(err.statusCode).json({

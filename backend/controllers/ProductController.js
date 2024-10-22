@@ -4,18 +4,13 @@ import ErrorHandler from "../utils/errorHandler.js";
 import APIFeatures from "../utils/apiFeatures.js";
 import { sendResponse } from "../utils/responseHandler.js";
 import { StatusCodes } from "http-status-codes";
-import {
-  findProducts,
-  createProduct,
-  findProductById,
-  updateProductById,
-  deleteProductById,
-} from "../DBoperations/productDB.js";
+import { factoryService } from "../services/factoryService.js";
+
 
 // Get all products - /api/v1/products
 export const getProducts = async (req, res, next) => {
   const resPerPage = 2;
-  const apiFeatures = new APIFeatures(findProducts(), req.query)
+  const apiFeatures = new APIFeatures(factoryService.find(Product), req.query)
     .search()
     .filter()
     .paginate(resPerPage);
@@ -28,10 +23,11 @@ export const getProducts = async (req, res, next) => {
   });
 };
 
+
 // Create a new product - /api/v1/product/new
 export const newProduct = async (req, res, next) => {
   req.body.user = req.user.id; // Assuming req.user is set by authentication middleware
-  const product = await createProduct(req.body);
+  const product = await factoryService.create(Product,req.body);
 
   sendResponse(
     res,
@@ -45,10 +41,10 @@ export const newProduct = async (req, res, next) => {
 // Get single product - /api/v1/product/:id
 export const getSingleProduct = async (req, res, next) => {
    const { id } = req.params;
-   const product = await findProductById(id);
+   const product = await factoryService.findById(Product,id);
 
   if (!product) {
-    return next(new ErrorHandler("Product not found", 404)); // Updated to 404 status code
+    return next(new ErrorHandler("Product not found", StatusCodes.NOT_FOUND)); // Updated to 404 status code
   }
 
   sendResponse(
@@ -65,13 +61,13 @@ export const getSingleProduct = async (req, res, next) => {
 // Update product - /api/v1/product/:id
 export const updateProduct = async (req, res, next) => {
   const { id } = req.params;
-  const product = await Product.findById(id);
+  const product = await factoryService.findById(Product,id)
 
   if (!product) {
-    return next(new ErrorHandler("Product not found", 404));
+    return next(new ErrorHandler("Product not found", StatusCodes.NOT_FOUND));
   }
 
-  const updatedProduct = await updateProductById(id, req.body);
+  const updatedProduct = await factoryService.updateById(Product,id,req.body);
 
   sendResponse(
     res,
@@ -87,13 +83,13 @@ export const updateProduct = async (req, res, next) => {
 // Delete product - /api/v1/product/:id
 export const deleteProduct = async (req, res, next) => {
     const { id } = req.params;
-  const product = await findProductById(id);
+  const product = await factoryService.findById(Product,id);
 
   if (!product) {
-    return next(new ErrorHandler("Product not found", 404)); // Using ErrorHandler
+    return next(new ErrorHandler("Product not found", StatusCodes.NOT_FOUND)); // Using ErrorHandler
   }
 
-  await deleteProductById(id);
+  await factoryService.deleteById(Product,id);
 
   sendResponse(res, StatusCodes.OK, true, "Product deleted successfully");
 
